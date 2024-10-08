@@ -135,13 +135,22 @@ app.delete('/posts/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
     try {
-        await pool.query('DELETE FROM posts WHERE IDPOST = ? AND userId = ?', [id, req.user.id]); // ลบโพสต์เฉพาะของผู้ใช้
+        // ลบสินค้าที่เชื่อมโยงกับโพสต์จากตาราง cart ก่อน
+        await pool.query('DELETE FROM cart WHERE shirtId = ?', [id]);
+
+        // จากนั้นลบโพสต์จากตาราง posts
+        const result = await pool.query('DELETE FROM posts WHERE IDPOST = ? AND userId = ?', [id, req.user.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'ไม่พบโพสต์หรือไม่มีสิทธิ์ในการลบ' });
+        }
         res.status(204).json(); // ลบโพสต์สำเร็จ
     } catch (error) {
         console.error('Error deleting post:', error);
-        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบโพสต์' });
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบโพสต์', error: error.message });
     }
 });
+
 
 // เส้นทางสำหรับอัปเดตโพสต์
 app.put('/posts/:id', authenticateToken, upload.single('image'), async (req, res) => {
